@@ -424,6 +424,7 @@ namespace Microsoft.WinGet.RestSource.Sqlite
             using var connection = this.OpenConnection();
             List<PackageManifest> allManifests = this.GetAllManifests(connection);
 
+            manifestSearchRequest ??= new ManifestSearchRequest();
             manifestSearchRequest.Inclusions ??= new Utils.Models.Arrays.SearchRequestPackageMatchFilter();
             manifestSearchRequest.Filters ??= new Utils.Models.Arrays.SearchRequestPackageMatchFilter();
 

@@ -111,6 +111,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinGet.RestSource.Fuzzing",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinGet.RestSource.Server", "WinGet.RestSource.Server\WinGet.RestSource.Server.csproj", "{C2BB675B-35D2-4F93-AD88-72CEEE1D99FD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinGet.RestSource.Server.Tests", "WinGet.RestSource.Server.Tests\WinGet.RestSource.Server.Tests.csproj", "{0198939A-33D1-4C82-9110-1513E420131F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -311,6 +313,24 @@ Global
 		{C2BB675B-35D2-4F93-AD88-72CEEE1D99FD}.Release|x64.Build.0 = Release|Any CPU
 		{C2BB675B-35D2-4F93-AD88-72CEEE1D99FD}.Release|x86.ActiveCfg = Release|Any CPU
 		{C2BB675B-35D2-4F93-AD88-72CEEE1D99FD}.Release|x86.Build.0 = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|x64.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Debug|x86.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|Any CPU.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|Any CPU.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|x64.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|x64.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|x86.ActiveCfg = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.LegacySupport|x86.Build.0 = Debug|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|x64.ActiveCfg = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|x64.Build.0 = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|x86.ActiveCfg = Release|Any CPU
+		{0198939A-33D1-4C82-9110-1513E420131F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
