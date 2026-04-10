@@ -1,0 +1,17 @@
+services:
+  winget-restsource:
+    build:
+      context: ..
+      dockerfile: WinGet.RestSource.Server/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - winget-data:/data
+    environment:
+      - Database__Path=/data/winget.db
+      - ServerIdentifier=winget-restsource-self-hosted
+      - ApiSettings__ApiKey=${API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  winget-data:

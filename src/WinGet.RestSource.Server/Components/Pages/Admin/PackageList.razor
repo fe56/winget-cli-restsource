@@ -1,0 +1,180 @@
+@page "/admin/packages"
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.WinGet.RestSource.Utils.Common
+@using Microsoft.WinGet.RestSource.Utils.Models.Schemas
+@using Microsoft.WinGet.RestSource.Utils.Models.Objects
+@using Microsoft.WinGet.RestSource.Utils.Constants.Enumerations
+@inject IApiDataStore DataStore
+@inject NavigationManager Navigation
+
+<h1>Packages</h1>
+
+<FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" Style="margin-bottom: 1rem;">
+    <FluentTextField @bind-Value="searchQuery" Placeholder="Search packages..." Style="flex: 1;" @onkeydown="OnSearchKeyDown" />
+    <FluentButton Appearance="Appearance.Accent" OnClick="Search">Search</FluentButton>
+    <FluentButton Appearance="Appearance.Accent" OnClick="ShowAddDialog">Add Package</FluentButton>
+</FluentStack>
+
+@if (isLoading)
+{
+    <FluentProgressRing />
+}
+else if (packages == null || !packages.Any())
+{
+    <FluentCard>
+        <p>No packages found. Add your first package to get started.</p>
+    </FluentCard>
+}
+else
+{
+    <FluentDataGrid Items="@packages.AsQueryable()" Pagination="@pagination" TGridItem="PackageManifest">
+        <PropertyColumn Property="@(p => p.PackageIdentifier)" Title="Package Identifier" Sortable="true" />
+        <TemplateColumn Title="Name">
+            @{
+                var name = GetPackageName(context);
+            }
+            @name
+        </TemplateColumn>
+        <TemplateColumn Title="Versions">
+            @(context.Versions?.Count ?? 0)
+        </TemplateColumn>
+        <TemplateColumn Title="Actions">
+            <FluentButton Appearance="Appearance.Outline" OnClick="@(() => ViewPackage(context.PackageIdentifier))">View</FluentButton>
+            <FluentButton Appearance="Appearance.Outline" OnClick="@(() => DeletePackage(context.PackageIdentifier))" Color="Color.Error">Delete</FluentButton>
+        </TemplateColumn>
+    </FluentDataGrid>
+
+    <FluentPaginator State="@pagination" />
+}
+
+@if (showError)
+{
+    <FluentMessageBar Title="Error" Intent="@MessageIntent.Error" Style="margin-top: 1rem;">
+        @errorMessage
+    </FluentMessageBar>
+}
+
+@code {
+    private List<PackageManifest>? packages;
+    private bool isLoading = true;
+    private string searchQuery = string.Empty;
+    private bool showError;
+    private string errorMessage = string.Empty;
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 20 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPackages();
+    }
+
+    private async Task LoadPackages()
+    {
+        isLoading = true;
+        showError = false;
+
+        try
+        {
+            var result = await DataStore.GetPackageManifests(null);
+            packages = result.Items?.ToList() ?? new List<PackageManifest>();
+        }
+        catch (Exception ex)
+        {
+            packages = new List<PackageManifest>();
+            showError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            await LoadPackages();
+            return;
+        }
+
+        isLoading = true;
+        showError = false;
+
+        try
+        {
+            var searchRequest = new ManifestSearchRequest
+            {
+                Query = new SearchRequestMatch
+                {
+                    KeyWord = searchQuery,
+                    MatchType = MatchType.Substring,
+                },
+            };
+
+            var result = await DataStore.SearchPackageManifests(searchRequest);
+            var identifiers = result.Items?.Select(r => r.PackageIdentifier).ToList() ?? new List<string>();
+
+            packages = new List<PackageManifest>();
+            foreach (var id in identifiers)
+            {
+                var manifests = await DataStore.GetPackageManifests(id);
+                if (manifests.Items?.Any() == true)
+                {
+                    packages.AddRange(manifests.Items);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            packages = new List<PackageManifest>();
+            showError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Search();
+        }
+    }
+
+    private void ViewPackage(string packageIdentifier)
+    {
+        Navigation.NavigateTo($"/admin/packages/{Uri.EscapeDataString(packageIdentifier)}");
+    }
+
+    private async Task DeletePackage(string packageIdentifier)
+    {
+        try
+        {
+            await DataStore.DeletePackageManifest(packageIdentifier);
+            await LoadPackages();
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Failed to delete package: {ex.Message}";
+        }
+    }
+
+    private void ShowAddDialog()
+    {
+        Navigation.NavigateTo("/admin/packages/new");
+    }
+
+    private string GetPackageName(PackageManifest manifest)
+    {
+        var version = manifest.Versions?.FirstOrDefault();
+        if (version is Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas.VersionExtended ve)
+        {
+            return ve.DefaultLocale?.PackageName ?? manifest.PackageIdentifier;
+        }
+        return version?.DefaultLocale?.PackageName ?? manifest.PackageIdentifier;
+    }
+}

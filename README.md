@@ -1,6 +1,90 @@
 # Welcome to the winget-cli-restsource repository
 
-## Create a Windows Package Manager REST source on Azure with PowerShell
+## Self-Hosted WinGet REST Source (Docker / SQLite)
+
+This fork adds a **self-hostable** WinGet REST source that runs in a Docker container with SQLite — no Azure dependencies required.
+
+### Quick Start (Docker)
+
+```bash
+# Clone the repository
+git clone https://github.com/user/winget-cli-restsource.git
+cd winget-cli-restsource/src/WinGet.RestSource.Server
+
+# Copy and edit environment config
+cp .env.example .env
+# Edit .env to set your API key:
+#   WINGET_API_KEY=your-secret-key-here
+
+# Start with Docker Compose
+docker compose up -d
+```
+
+The server starts on **http://localhost:8080**:
+- **REST API**: `http://localhost:8080/api/` — winget client compatible
+- **Admin UI**: `http://localhost:8080/admin` — Blazor FluentUI management dashboard
+
+### Add as a winget source
+
+```powershell
+winget source add -n "my-private-repo" -a http://localhost:8080/api/ -t "Microsoft.Rest"
+```
+
+### Configuration
+
+Configuration via environment variables or `appsettings.json`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `ApiSettings__ApiKey` | *(empty)* | API key for write operations (POST/PUT/DELETE). If empty, writes are unrestricted. |
+| `Database__Path` | `data/winget.db` | Path to SQLite database file |
+| `ServerIdentifier` | `winget-restsource-self-hosted` | Server identifier returned by `/api/information` |
+
+### Data Persistence
+
+The SQLite database is stored at `/data/winget.db` inside the container. Mount a volume to persist data:
+
+```yaml
+volumes:
+  - winget-data:/data
+```
+
+### API Authentication
+
+- **GET** routes are open (no authentication) — winget clients can read without credentials
+- **POST/PUT/DELETE** routes require an `X-Api-Key` header matching the configured API key
+
+```bash
+# Add a package manifest
+curl -X POST http://localhost:8080/api/packageManifests \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: your-secret-key-here" \
+  -d @manifest.json
+```
+
+### Running Without Docker
+
+```bash
+cd src/WinGet.RestSource.Server
+dotnet run
+```
+
+The server starts on `http://localhost:5141` by default (configurable in `Properties/launchSettings.json`).
+
+### Admin Dashboard
+
+The built-in Blazor Server UI at `/admin` provides:
+- **Dashboard** — Package count overview
+- **Package List** — Searchable/filterable grid of all packages
+- **Package Detail** — View versions, installers, locales; edit via JSON
+
+---
+
+## Azure Deployment (Original)
+
+The original Azure-based deployment using Azure Functions and Cosmos DB is still available in the `WinGet.RestSource.Functions` project.
+
+### Create a Windows Package Manager REST source on Azure with PowerShell
 
 The [Microsoft.WinGet.RestSource](https://www.powershellgallery.com/packages/Microsoft.WinGet.RestSource) PowerShell module is provided for creating and managing Windows Package Manager REST sources.
 
@@ -14,12 +98,23 @@ Please visit [Create a Windows Package Manager REST source](/Tools/PowershellMod
 * [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)
 * The following workloads:
    * .NET desktop development
-   * Azure development
+   * Azure development (only needed for Azure Functions project)
    * ASP<area>.NET and web development
 
 Open `src\WinGet.RestSource.sln` in Visual Studio and build. We currently only build using the solution; command line methods of building a VS solution should work as well.
 
 ## Running locally
+
+### Self-Hosted Server (Recommended)
+
+```bash
+cd src/WinGet.RestSource.Server
+dotnet run
+```
+
+Then add the source: `winget source add -n "local" -a http://localhost:5141/api/ -t "Microsoft.Rest"`
+
+### Azure Functions (Legacy)
 
 The REST functions can be run locally, but to use winget with them, the functions must be run using HTTPS. This is pre-configured by the `launchSettings.json` file.
 

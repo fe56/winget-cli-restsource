@@ -1,0 +1,217 @@
+@page "/admin/packages/new"
+@page "/admin/packages/{PackageId}"
+@using Microsoft.WinGet.RestSource.Utils.Common
+@using Microsoft.WinGet.RestSource.Utils.Models.Schemas
+@using Newtonsoft.Json
+@inject IApiDataStore DataStore
+@inject NavigationManager Navigation
+
+<h1>@(IsNew ? "Add Package Manifest" : $"Package: {PackageId}")</h1>
+
+<FluentButton Appearance="Appearance.Outline" OnClick="GoBack" Style="margin-bottom: 1rem;">← Back to Packages</FluentButton>
+
+@if (isLoading)
+{
+    <FluentProgressRing />
+}
+else if (IsNew || isEditing)
+{
+    <FluentCard Style="margin-bottom: 1rem;">
+        <h3>@(IsNew ? "Paste Package Manifest JSON" : "Edit Manifest JSON")</h3>
+        <FluentTextArea @bind-Value="jsonContent" Rows="25" Style="width: 100%; font-family: monospace;" Placeholder="Paste the full PackageManifest JSON here..." />
+        <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 1rem;">
+            <FluentButton Appearance="Appearance.Accent" OnClick="SaveManifest">Save</FluentButton>
+            @if (!IsNew)
+            {
+                <FluentButton Appearance="Appearance.Outline" OnClick="CancelEdit">Cancel</FluentButton>
+            }
+        </FluentStack>
+    </FluentCard>
+}
+else if (manifest != null)
+{
+    <FluentStack Orientation="Orientation.Horizontal" Style="margin-bottom: 1rem;">
+        <FluentButton Appearance="Appearance.Accent" OnClick="StartEdit">Edit JSON</FluentButton>
+        <FluentButton Appearance="Appearance.Outline" OnClick="@(() => DeletePackage())" Color="Color.Error">Delete</FluentButton>
+    </FluentStack>
+
+    <FluentCard Style="margin-bottom: 1rem;">
+        <h3>Package Information</h3>
+        <p><strong>Identifier:</strong> @manifest.PackageIdentifier</p>
+        <p><strong>Versions:</strong> @(manifest.Versions?.Count ?? 0)</p>
+    </FluentCard>
+
+    @if (manifest.Versions?.Any() == true)
+    {
+        foreach (var version in manifest.Versions)
+        {
+            <FluentCard Style="margin-bottom: 0.5rem;">
+                <h4>Version: @version.PackageVersion</h4>
+                @if (version.DefaultLocale != null)
+                {
+                    <p><strong>Name:</strong> @version.DefaultLocale.PackageName</p>
+                    <p><strong>Publisher:</strong> @version.DefaultLocale.Publisher</p>
+                    <p><strong>Description:</strong> @version.DefaultLocale.ShortDescription</p>
+                }
+
+                @if (version is Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas.VersionExtended ve)
+                {
+                    @if (ve.Installers?.Any() == true)
+                    {
+                        <h5>Installers (@ve.Installers.Count)</h5>
+                        <FluentDataGrid Items="@ve.Installers.AsQueryable()" TGridItem="Installer">
+                            <PropertyColumn Property="@(i => i.InstallerIdentifier)" Title="Identifier" />
+                            <PropertyColumn Property="@(i => i.Architecture)" Title="Architecture" />
+                            <PropertyColumn Property="@(i => i.InstallerType)" Title="Type" />
+                            <PropertyColumn Property="@(i => i.InstallerUrl)" Title="URL" />
+                        </FluentDataGrid>
+                    }
+
+                    @if (ve.Locales?.Any() == true)
+                    {
+                        <h5>Locales (@ve.Locales.Count)</h5>
+                        <FluentDataGrid Items="@ve.Locales.AsQueryable()" TGridItem="Locale">
+                            <PropertyColumn Property="@(l => l.PackageLocale)" Title="Locale" />
+                            <PropertyColumn Property="@(l => l.PackageName)" Title="Name" />
+                            <PropertyColumn Property="@(l => l.Publisher)" Title="Publisher" />
+                        </FluentDataGrid>
+                    }
+                }
+            </FluentCard>
+        }
+    }
+
+    <FluentCard>
+        <h3>Raw JSON</h3>
+        <pre style="max-height: 400px; overflow: auto; background: #f5f5f5; padding: 1rem; border-radius: 4px;">@(JsonConvert.SerializeObject(manifest, Formatting.Indented, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }))</pre>
+    </FluentCard>
+}
+
+@if (showError)
+{
+    <FluentMessageBar Title="Error" Intent="@MessageIntent.Error" Style="margin-top: 1rem;">
+        @errorMessage
+    </FluentMessageBar>
+}
+
+@if (showSuccess)
+{
+    <FluentMessageBar Title="Success" Intent="@MessageIntent.Success" Style="margin-top: 1rem;">
+        @successMessage
+    </FluentMessageBar>
+}
+
+@code {
+    [Parameter]
+    public string? PackageId { get; set; }
+
+    private PackageManifest? manifest;
+    private bool isLoading;
+    private bool isEditing;
+    private string jsonContent = string.Empty;
+    private bool showError;
+    private string errorMessage = string.Empty;
+    private bool showSuccess;
+    private string successMessage = string.Empty;
+
+    private bool IsNew => string.IsNullOrEmpty(PackageId) || PackageId == "new";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            await LoadPackage();
+        }
+    }
+
+    private async Task LoadPackage()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await DataStore.GetPackageManifests(PackageId!);
+            manifest = result.Items?.FirstOrDefault();
+            if (manifest != null)
+            {
+                jsonContent = JsonConvert.SerializeObject(manifest, Formatting.Indented,
+                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartEdit()
+    {
+        isEditing = true;
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+    }
+
+    private async Task SaveManifest()
+    {
+        showError = false;
+        showSuccess = false;
+
+        try
+        {
+            var parsed = JsonConvert.DeserializeObject<PackageManifest>(jsonContent);
+            if (parsed == null)
+            {
+                showError = true;
+                errorMessage = "Failed to parse JSON as PackageManifest.";
+                return;
+            }
+
+            if (IsNew)
+            {
+                await DataStore.AddPackageManifest(parsed);
+                showSuccess = true;
+                successMessage = $"Package '{parsed.PackageIdentifier}' added successfully.";
+                Navigation.NavigateTo($"/admin/packages/{Uri.EscapeDataString(parsed.PackageIdentifier)}");
+            }
+            else
+            {
+                await DataStore.UpdatePackageManifest(PackageId!, parsed);
+                manifest = parsed;
+                isEditing = false;
+                showSuccess = true;
+                successMessage = "Package updated successfully.";
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeletePackage()
+    {
+        try
+        {
+            await DataStore.DeletePackageManifest(PackageId!);
+            Navigation.NavigateTo("/admin/packages");
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Failed to delete: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/admin/packages");
+    }
+}

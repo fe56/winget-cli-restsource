@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+@using Microsoft.FluentUI.AspNetCore.Components
+
+<FluentLayout>
+    <FluentHeader>
+        WinGet REST Source
+    </FluentHeader>
+
+    <FluentStack Orientation="Orientation.Horizontal" Width="100%">
+        <FluentNavMenu Width="250" Title="Navigation">
+            <FluentNavLink Href="/admin" Match="NavLinkMatch.All">Dashboard</FluentNavLink>
+            <FluentNavLink Href="/admin/packages">Packages</FluentNavLink>
+        </FluentNavMenu>
+
+        <FluentBodyContent>
+            <div style="padding: 1rem;">
+                @Body
+            </div>
+        </FluentBodyContent>
+    </FluentStack>
+
+    <FluentFooter>
+        <div style="text-align: center; width: 100%; font-size: 0.8rem; color: #888;">
+            WinGet REST Source — Self-Hosted
+        </div>
+    </FluentFooter>
+</FluentLayout>

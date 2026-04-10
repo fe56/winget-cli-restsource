@@ -1,0 +1,33 @@
+@page "/admin"
+@using Microsoft.WinGet.RestSource.Utils.Common
+@inject IApiDataStore DataStore
+
+<h1>Dashboard</h1>
+
+<FluentStack Orientation="Orientation.Horizontal" Wrap="true">
+    <FluentCard Style="min-width: 200px; margin: 0.5rem;">
+        <h3>Total Packages</h3>
+        <p style="font-size: 2rem; font-weight: bold;">@packageCount</p>
+    </FluentCard>
+
+    <FluentCard Style="min-width: 200px; margin: 0.5rem;">
+        <h3>Server Status</h3>
+        <p style="font-size: 1.2rem; color: green;">● Online</p>
+    </FluentCard>
+</FluentStack>
+
+@code {
+    private int packageCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            packageCount = await DataStore.Count();
+        }
+        catch
+        {
+            packageCount = 0;
+        }
+    }
+}
