@@ -1,105 +1,144 @@
 @page "/admin/packages/new"
 @page "/admin/packages/{PackageId}"
-@using Microsoft.WinGet.RestSource.Utils.Common
+@using System.Text
+@using Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas
 @using Microsoft.WinGet.RestSource.Utils.Models.Schemas
-@using Newtonsoft.Json
-@inject IApiDataStore DataStore
+@inject PackageCatalogService Catalog
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 
-<h1>@(IsNew ? "Add Package Manifest" : $"Package: {PackageId}")</h1>
+<PageTitle>@(IsNew ? "Add package" : PackageId)</PageTitle>
 
-<FluentButton Appearance="Appearance.Outline" OnClick="GoBack" Style="margin-bottom: 1rem;">← Back to Packages</FluentButton>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
+    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">
+        @(IsNew ? "Add package manifest" : $"Package: {PackageId}")
+    </FluentText>
 
-@if (isLoading)
-{
-    <FluentProgressRing />
-}
-else if (IsNew || isEditing)
-{
-    <FluentCard Style="margin-bottom: 1rem;">
-        <h3>@(IsNew ? "Paste Package Manifest JSON" : "Edit Manifest JSON")</h3>
-        <FluentTextArea @bind-Value="jsonContent" Rows="25" Style="width: 100%; font-family: monospace;" Placeholder="Paste the full PackageManifest JSON here..." />
-        <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 1rem;">
-            <FluentButton Appearance="Appearance.Accent" OnClick="SaveManifest">Save</FluentButton>
-            @if (!IsNew)
-            {
-                <FluentButton Appearance="Appearance.Outline" OnClick="CancelEdit">Cancel</FluentButton>
-            }
-        </FluentStack>
-    </FluentCard>
-}
-else if (manifest != null)
-{
-    <FluentStack Orientation="Orientation.Horizontal" Style="margin-bottom: 1rem;">
-        <FluentButton Appearance="Appearance.Accent" OnClick="StartEdit">Edit JSON</FluentButton>
-        <FluentButton Appearance="Appearance.Outline" OnClick="@(() => DeletePackage())" Color="Color.Error">Delete</FluentButton>
-    </FluentStack>
+    <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@(() => Navigation.NavigateTo("/admin/packages"))">
+        Back to packages
+    </FluentButton>
 
-    <FluentCard Style="margin-bottom: 1rem;">
-        <h3>Package Information</h3>
-        <p><strong>Identifier:</strong> @manifest.PackageIdentifier</p>
-        <p><strong>Versions:</strong> @(manifest.Versions?.Count ?? 0)</p>
-    </FluentCard>
-
-    @if (manifest.Versions?.Any() == true)
+    @if (isLoading)
     {
-        foreach (var version in manifest.Versions)
+        <FluentSpinner />
+    }
+    else if (IsNew || isEditing)
+    {
+        <FluentTabs @bind-ActiveTabId="activeTabId">
+            <FluentTab Id="yaml-tab" Header="YAML">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12px" Style="margin-top: 1rem;">
+                    <FluentText>
+                        Paste a merged winget YAML manifest, or upload a .yaml file.
+                    </FluentText>
+                    <FluentInputFile Id="yaml-uploader"
+                                     Mode="InputFileMode.Stream"
+                                     Multiple="false"
+                                     Accept=".yaml,.yml"
+                                     MaximumFileCount="1"
+                                     MaximumFileSize="1048576"
+                                     Height="120px"
+                                     OnFileUploaded="OnYamlFileUploadedAsync">
+                        <ChildContent>
+                            <label for="yaml-uploader">
+                                Drop a YAML file here or browse
+                            </label>
+                        </ChildContent>
+                    </FluentInputFile>
+                    <FluentTextArea @bind-Value="yamlContent"
+                                    Placeholder="Paste merged YAML here..."
+                                    Width="100%"
+                                    Height="360px" />
+                    <FluentButton Appearance="ButtonAppearance.Primary" OnClick="SaveYamlAsync">Save YAML</FluentButton>
+                </FluentStack>
+            </FluentTab>
+            <FluentTab Id="json-tab" Header="JSON">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12px" Style="margin-top: 1rem;">
+                    <FluentText>
+                        Paste the REST PackageManifest JSON document.
+                    </FluentText>
+                    <FluentTextArea @bind-Value="jsonContent"
+                                    Placeholder="Paste PackageManifest JSON here..."
+                                    Width="100%"
+                                    Height="360px" />
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8px">
+                        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="SaveJsonAsync">Save JSON</FluentButton>
+                        @if (!IsNew)
+                        {
+                            <FluentButton Appearance="ButtonAppearance.Outline" OnClick="CancelEdit">Cancel</FluentButton>
+                        }
+                    </FluentStack>
+                </FluentStack>
+            </FluentTab>
+        </FluentTabs>
+    }
+    else if (manifest != null)
+    {
+        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8px">
+            <FluentButton Appearance="ButtonAppearance.Primary" OnClick="StartEdit">Edit</FluentButton>
+            <FluentButton Appearance="ButtonAppearance.Outline" Color="Color.Error" OnClick="DeletePackageAsync">Delete</FluentButton>
+        </FluentStack>
+
+        <FluentCard>
+            <p><strong>Identifier:</strong> @manifest.PackageIdentifier</p>
+            <p><strong>Versions:</strong> @(manifest.Versions?.Count ?? 0)</p>
+        </FluentCard>
+
+        @if (manifest.Versions != null)
         {
-            <FluentCard Style="margin-bottom: 0.5rem;">
-                <h4>Version: @version.PackageVersion</h4>
-                @if (version.DefaultLocale != null)
-                {
-                    <p><strong>Name:</strong> @version.DefaultLocale.PackageName</p>
-                    <p><strong>Publisher:</strong> @version.DefaultLocale.Publisher</p>
-                    <p><strong>Description:</strong> @version.DefaultLocale.ShortDescription</p>
-                }
-
-                @if (version is Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas.VersionExtended ve)
-                {
-                    @if (ve.Installers?.Any() == true)
+            foreach (var version in manifest.Versions)
+            {
+                <FluentCard>
+                    <FluentText Weight="TextWeight.Semibold">Version @version.PackageVersion</FluentText>
+                    @if (version.DefaultLocale != null)
                     {
-                        <h5>Installers (@ve.Installers.Count)</h5>
-                        <FluentDataGrid Items="@ve.Installers.AsQueryable()" TGridItem="Installer">
-                            <PropertyColumn Property="@(i => i.InstallerIdentifier)" Title="Identifier" />
-                            <PropertyColumn Property="@(i => i.Architecture)" Title="Architecture" />
-                            <PropertyColumn Property="@(i => i.InstallerType)" Title="Type" />
-                            <PropertyColumn Property="@(i => i.InstallerUrl)" Title="URL" />
-                        </FluentDataGrid>
+                        <p><strong>Name:</strong> @version.DefaultLocale.PackageName</p>
+                        <p><strong>Publisher:</strong> @version.DefaultLocale.Publisher</p>
+                        <p><strong>Description:</strong> @version.DefaultLocale.ShortDescription</p>
                     }
 
-                    @if (ve.Locales?.Any() == true)
+                    @if (version is VersionExtended extended)
                     {
-                        <h5>Locales (@ve.Locales.Count)</h5>
-                        <FluentDataGrid Items="@ve.Locales.AsQueryable()" TGridItem="Locale">
-                            <PropertyColumn Property="@(l => l.PackageLocale)" Title="Locale" />
-                            <PropertyColumn Property="@(l => l.PackageName)" Title="Name" />
-                            <PropertyColumn Property="@(l => l.Publisher)" Title="Publisher" />
-                        </FluentDataGrid>
+                        @if (extended.Installers?.Any() == true)
+                        {
+                            <FluentText Weight="TextWeight.Semibold">Installers (@extended.Installers.Count)</FluentText>
+                            <FluentDataGrid Items="@extended.Installers.AsQueryable()" TGridItem="Installer">
+                                <PropertyColumn Property="@(i => i.InstallerIdentifier)" Title="Identifier" />
+                                <PropertyColumn Property="@(i => i.Architecture)" Title="Architecture" />
+                                <PropertyColumn Property="@(i => i.InstallerType)" Title="Type" />
+                                <PropertyColumn Property="@(i => i.InstallerUrl)" Title="URL" />
+                            </FluentDataGrid>
+                        }
+
+                        @if (extended.Locales?.Any() == true)
+                        {
+                            <FluentText Weight="TextWeight.Semibold">Locales (@extended.Locales.Count)</FluentText>
+                            <FluentDataGrid Items="@extended.Locales.AsQueryable()" TGridItem="Locale">
+                                <PropertyColumn Property="@(l => l.PackageLocale)" Title="Locale" />
+                                <PropertyColumn Property="@(l => l.PackageName)" Title="Name" />
+                                <PropertyColumn Property="@(l => l.Publisher)" Title="Publisher" />
+                            </FluentDataGrid>
+                        }
                     }
-                }
-            </FluentCard>
+                </FluentCard>
+            }
         }
+
+        <FluentCard>
+            <FluentText Weight="TextWeight.Semibold">Raw JSON</FluentText>
+            <pre class="raw-json">@PackageCatalogService.ToPrettyJson(manifest)</pre>
+        </FluentCard>
     }
 
-    <FluentCard>
-        <h3>Raw JSON</h3>
-        <pre style="max-height: 400px; overflow: auto; background: #f5f5f5; padding: 1rem; border-radius: 4px;">@(JsonConvert.SerializeObject(manifest, Formatting.Indented, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }))</pre>
-    </FluentCard>
-}
+    @if (showError)
+    {
+        <FluentMessageBar Title="Error" Intent="@MessageBarIntent.Error">@errorMessage</FluentMessageBar>
+    }
 
-@if (showError)
-{
-    <FluentMessageBar Title="Error" Intent="@MessageIntent.Error" Style="margin-top: 1rem;">
-        @errorMessage
-    </FluentMessageBar>
-}
-
-@if (showSuccess)
-{
-    <FluentMessageBar Title="Success" Intent="@MessageIntent.Success" Style="margin-top: 1rem;">
-        @successMessage
-    </FluentMessageBar>
-}
+    @if (showSuccess)
+    {
+        <FluentMessageBar Title="Success" Intent="@MessageBarIntent.Success">@successMessage</FluentMessageBar>
+    }
+</FluentStack>
 
 @code {
     [Parameter]
@@ -109,6 +148,8 @@ else if (manifest != null)
     private bool isLoading;
     private bool isEditing;
     private string jsonContent = string.Empty;
+    private string yamlContent = string.Empty;
+    private string activeTabId = "yaml-tab";
     private bool showError;
     private string errorMessage = string.Empty;
     private bool showSuccess;
@@ -116,31 +157,34 @@ else if (manifest != null)
 
     private bool IsNew => string.IsNullOrEmpty(PackageId) || PackageId == "new";
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        if (!IsNew)
+        if (IsNew)
         {
-            await LoadPackage();
+            manifest = null;
+            isEditing = false;
+            return;
         }
+
+        await LoadPackageAsync();
     }
 
-    private async Task LoadPackage()
+    private async Task LoadPackageAsync()
     {
         isLoading = true;
+        showError = false;
         try
         {
-            var result = await DataStore.GetPackageManifests(PackageId!);
-            manifest = result.Items?.FirstOrDefault();
+            manifest = await Catalog.GetAsync(Uri.UnescapeDataString(PackageId!));
             if (manifest != null)
             {
-                jsonContent = JsonConvert.SerializeObject(manifest, Formatting.Indented,
-                    new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+                jsonContent = PackageCatalogService.ToPrettyJson(manifest);
             }
         }
         catch (Exception ex)
         {
             showError = true;
-            errorMessage = ex.Message;
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
         }
         finally
         {
@@ -151,67 +195,94 @@ else if (manifest != null)
     private void StartEdit()
     {
         isEditing = true;
+        activeTabId = "json-tab";
+        showError = false;
+        showSuccess = false;
     }
 
     private void CancelEdit()
     {
         isEditing = false;
+        if (manifest != null)
+        {
+            jsonContent = PackageCatalogService.ToPrettyJson(manifest);
+        }
     }
 
-    private async Task SaveManifest()
+    private async Task OnYamlFileUploadedAsync(FluentInputFileEventArgs file)
+    {
+        if (file.Stream is null)
+        {
+            return;
+        }
+
+        using var reader = new StreamReader(file.Stream, Encoding.UTF8, leaveOpen: false);
+        yamlContent = await reader.ReadToEndAsync();
+    }
+
+    private async Task SaveYamlAsync()
     {
         showError = false;
         showSuccess = false;
-
         try
         {
-            var parsed = JsonConvert.DeserializeObject<PackageManifest>(jsonContent);
-            if (parsed == null)
-            {
-                showError = true;
-                errorMessage = "Failed to parse JSON as PackageManifest.";
-                return;
-            }
-
-            if (IsNew)
-            {
-                await DataStore.AddPackageManifest(parsed);
-                showSuccess = true;
-                successMessage = $"Package '{parsed.PackageIdentifier}' added successfully.";
-                Navigation.NavigateTo($"/admin/packages/{Uri.EscapeDataString(parsed.PackageIdentifier)}");
-            }
-            else
-            {
-                await DataStore.UpdatePackageManifest(PackageId!, parsed);
-                manifest = parsed;
-                isEditing = false;
-                showSuccess = true;
-                successMessage = "Package updated successfully.";
-            }
+            var saved = await Catalog.AddFromYamlAsync(yamlContent);
+            Navigation.NavigateTo($"/admin/packages/{Uri.EscapeDataString(saved.PackageIdentifier)}");
         }
         catch (Exception ex)
         {
             showError = true;
-            errorMessage = ex.Message;
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
         }
     }
 
-    private async Task DeletePackage()
+    private async Task SaveJsonAsync()
     {
+        showError = false;
+        showSuccess = false;
         try
         {
-            await DataStore.DeletePackageManifest(PackageId!);
+            if (IsNew)
+            {
+                var saved = await Catalog.AddFromJsonAsync(jsonContent);
+                Navigation.NavigateTo($"/admin/packages/{Uri.EscapeDataString(saved.PackageIdentifier)}");
+                return;
+            }
+
+            manifest = await Catalog.UpdateFromJsonAsync(PackageId!, jsonContent);
+            isEditing = false;
+            showSuccess = true;
+            successMessage = "Package updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
+        }
+    }
+
+    private async Task DeletePackageAsync()
+    {
+        var result = await DialogService.ShowConfirmationAsync(
+            $"Delete package '{PackageId}'? This cannot be undone.",
+            "Delete package",
+            "Delete",
+            "Cancel");
+
+        if (result.Cancelled)
+        {
+            return;
+        }
+
+        try
+        {
+            await Catalog.DeleteAsync(PackageId!);
             Navigation.NavigateTo("/admin/packages");
         }
         catch (Exception ex)
         {
             showError = true;
-            errorMessage = $"Failed to delete: {ex.Message}";
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
         }
-    }
-
-    private void GoBack()
-    {
-        Navigation.NavigateTo("/admin/packages");
     }
 }

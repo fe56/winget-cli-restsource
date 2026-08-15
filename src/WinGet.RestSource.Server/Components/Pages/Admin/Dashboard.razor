@@ -1,33 +1,80 @@
 @page "/admin"
-@using Microsoft.WinGet.RestSource.Utils.Common
-@inject IApiDataStore DataStore
+@using Microsoft.WinGet.RestSource.Utils.Models.Schemas
+@inject PackageCatalogService Catalog
+@inject NavigationManager Navigation
 
-<h1>Dashboard</h1>
+<PageTitle>Dashboard</PageTitle>
 
-<FluentStack Orientation="Orientation.Horizontal" Wrap="true">
-    <FluentCard Style="min-width: 200px; margin: 0.5rem;">
-        <h3>Total Packages</h3>
-        <p style="font-size: 2rem; font-weight: bold;">@packageCount</p>
-    </FluentCard>
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
+    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Dashboard</FluentText>
 
-    <FluentCard Style="min-width: 200px; margin: 0.5rem;">
-        <h3>Server Status</h3>
-        <p style="font-size: 1.2rem; color: green;">● Online</p>
-    </FluentCard>
+    @if (isLoading)
+    {
+        <FluentSpinner />
+    }
+    else
+    {
+        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="16px">
+            <FluentCard Style="min-width: 200px;">
+                <FluentText Weight="TextWeight.Semibold">Total packages</FluentText>
+                <FluentText Weight="TextWeight.Bold" Size="TextSize.Size700">@packageCount</FluentText>
+            </FluentCard>
+            <FluentCard Style="min-width: 200px;">
+                <FluentText Weight="TextWeight.Semibold">Server status</FluentText>
+                <FluentText>Online</FluentText>
+            </FluentCard>
+            <FluentCard Style="min-width: 240px;">
+                <FluentText Weight="TextWeight.Semibold">Source identifier</FluentText>
+                <FluentText>@sourceIdentifier</FluentText>
+            </FluentCard>
+        </FluentStack>
+
+        <FluentCard>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
+                <FluentText Weight="TextWeight.Semibold">Use with winget</FluentText>
+                <div class="command-block">@WingetAddCommand</div>
+                <FluentText>
+                    Supported REST versions: @string.Join(", ", supportedVersions)
+                </FluentText>
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8px">
+                    <FluentButton Appearance="ButtonAppearance.Primary" OnClick="@(() => Navigation.NavigateTo("/admin/packages"))">
+                        Manage packages
+                    </FluentButton>
+                    <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@(() => Navigation.NavigateTo("/"))">
+                        Browse catalog
+                    </FluentButton>
+                </FluentStack>
+            </FluentStack>
+        </FluentCard>
+    }
 </FluentStack>
 
 @code {
     private int packageCount;
+    private bool isLoading = true;
+    private string sourceIdentifier = string.Empty;
+    private IReadOnlyList<string> supportedVersions = Array.Empty<string>();
+
+    private string WingetAddCommand =>
+        $"winget source add -n local -a {Navigation.BaseUri.TrimEnd('/')}/api -t Microsoft.Rest";
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            packageCount = await DataStore.Count();
+            packageCount = await Catalog.CountAsync();
+            var information = new Information();
+            sourceIdentifier = information.SourceIdentifier;
+            supportedVersions = information.ServerSupportedVersions?.ToList() ?? new List<string>();
         }
         catch
         {
             packageCount = 0;
+            sourceIdentifier = "unavailable";
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 }

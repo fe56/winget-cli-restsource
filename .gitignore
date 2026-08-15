@@ -374,3 +374,9 @@ Microsoft.WinGet.*.Documentation.xml
 # Developer ARM template
 src/WinGet.RestSource.Infrastructure/**/*.dev.*json
 
+# Self-hosted SQLite database
+src/WinGet.RestSource.Server/data/
+*.db
+*.db-wal
+*.db-shm
+

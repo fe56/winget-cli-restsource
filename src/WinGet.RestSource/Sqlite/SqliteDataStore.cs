@@ -9,6 +9,7 @@ namespace Microsoft.WinGet.RestSource.Sqlite
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.Data.Sqlite;
     using Microsoft.Extensions.Logging;
@@ -50,6 +51,7 @@ namespace Microsoft.WinGet.RestSource.Sqlite
 
         private readonly string connectionString;
         private readonly ILogger<SqliteDataStore> log;
+        private readonly SemaphoreSlim writeLock = new SemaphoreSlim(1, 1);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SqliteDataStore"/> class.
@@ -84,32 +86,26 @@ namespace Microsoft.WinGet.RestSource.Sqlite
             PackageManifest packageManifest = new PackageManifest(package);
             ApiDataValidator.Validate(packageManifest);
 
-            using var connection = this.OpenConnection();
-            this.InsertManifest(connection, packageManifest);
-
-            return Task.CompletedTask;
+            return this.WriteAsync(connection => this.InsertManifest(connection, packageManifest));
         }
 
         /// <inheritdoc />
         public Task DeletePackage(string packageIdentifier)
         {
-            using var connection = this.OpenConnection();
-            this.DeleteManifestRow(connection, packageIdentifier);
-
-            return Task.CompletedTask;
+            return this.WriteAsync(connection => this.DeleteManifestRow(connection, packageIdentifier));
         }
 
         /// <inheritdoc />
         public Task UpdatePackage(string packageIdentifier, Package package)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.Update(package);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.Update(package);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
@@ -151,47 +147,47 @@ namespace Microsoft.WinGet.RestSource.Sqlite
         /// <inheritdoc />
         public Task AddVersion(string packageIdentifier, Version version)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.AddVersion(version);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.AddVersion(version);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
         public Task DeleteVersion(string packageIdentifier, string packageVersion)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.RemoveVersion(packageVersion);
-
-            if (manifest.Versions is null)
+            return this.WriteAsync(connection =>
             {
-                this.DeleteManifestRow(connection, packageIdentifier);
-            }
-            else
-            {
-                ApiDataValidator.Validate(manifest);
-                this.UpsertManifest(connection, manifest);
-            }
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.RemoveVersion(packageVersion);
 
-            return Task.CompletedTask;
+                if (manifest.Versions is null)
+                {
+                    this.DeleteManifestRow(connection, packageIdentifier);
+                }
+                else
+                {
+                    ApiDataValidator.Validate(manifest);
+                    this.UpsertManifest(connection, manifest);
+                }
+            });
         }
 
         /// <inheritdoc />
         public Task UpdateVersion(string packageIdentifier, string packageVersion, Version version)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.Versions.Update(version);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.Versions.Update(version);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
@@ -209,57 +205,57 @@ namespace Microsoft.WinGet.RestSource.Sqlite
         /// <inheritdoc />
         public Task AddInstaller(string packageIdentifier, string packageVersion, Installer installer)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.AddInstaller(installer, packageVersion);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.AddInstaller(installer, packageVersion);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
         public Task DeleteInstaller(string packageIdentifier, string packageVersion, string installerIdentifier)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.RemoveInstaller(installerIdentifier, packageVersion);
-
-            if (manifest.GetVersion(packageVersion)[0].Installers is null)
+            return this.WriteAsync(connection =>
             {
-                // No installer left, delete the version
-                manifest.RemoveVersion(packageVersion);
-                if (manifest.Versions is null)
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.RemoveInstaller(installerIdentifier, packageVersion);
+
+                if (manifest.GetVersion(packageVersion)[0].Installers is null)
                 {
-                    this.DeleteManifestRow(connection, packageIdentifier);
+                    // No installer left, delete the version
+                    manifest.RemoveVersion(packageVersion);
+                    if (manifest.Versions is null)
+                    {
+                        this.DeleteManifestRow(connection, packageIdentifier);
+                    }
+                    else
+                    {
+                        ApiDataValidator.Validate(manifest);
+                        this.UpsertManifest(connection, manifest);
+                    }
                 }
                 else
                 {
                     ApiDataValidator.Validate(manifest);
                     this.UpsertManifest(connection, manifest);
                 }
-            }
-            else
-            {
-                ApiDataValidator.Validate(manifest);
-                this.UpsertManifest(connection, manifest);
-            }
-
-            return Task.CompletedTask;
+            });
         }
 
         /// <inheritdoc />
         public Task UpdateInstaller(string packageIdentifier, string packageVersion, string installerIdentifier, Installer installer)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.UpdateInstaller(installer, packageVersion);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.UpdateInstaller(installer, packageVersion);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
@@ -277,40 +273,40 @@ namespace Microsoft.WinGet.RestSource.Sqlite
         /// <inheritdoc />
         public Task AddLocale(string packageIdentifier, string packageVersion, Locale locale)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.AddLocale(locale, packageVersion);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.AddLocale(locale, packageVersion);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
         public Task DeleteLocale(string packageIdentifier, string packageVersion, string packageLocale)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.RemoveLocale(packageLocale, packageVersion);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.RemoveLocale(packageLocale, packageVersion);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
         public Task UpdateLocale(string packageIdentifier, string packageVersion, string packageLocale, Locale locale)
         {
-            using var connection = this.OpenConnection();
-            PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
-            manifest.UpdateLocale(locale, packageVersion);
+            return this.WriteAsync(connection =>
+            {
+                PackageManifest manifest = this.GetManifestOrThrow(connection, packageIdentifier);
+                manifest.UpdateLocale(locale, packageVersion);
 
-            ApiDataValidator.Validate(manifest);
-            this.UpsertManifest(connection, manifest);
-
-            return Task.CompletedTask;
+                ApiDataValidator.Validate(manifest);
+                this.UpsertManifest(connection, manifest);
+            });
         }
 
         /// <inheritdoc />
@@ -328,10 +324,8 @@ namespace Microsoft.WinGet.RestSource.Sqlite
         /// <inheritdoc />
         public Task AddPackageManifest(PackageManifest packageManifest)
         {
-            using var connection = this.OpenConnection();
-            this.InsertManifest(connection, packageManifest);
-
-            return Task.CompletedTask;
+            ApiDataValidator.Validate(packageManifest);
+            return this.WriteAsync(connection => this.InsertManifest(connection, packageManifest));
         }
 
         /// <inheritdoc />
@@ -343,13 +337,13 @@ namespace Microsoft.WinGet.RestSource.Sqlite
         /// <inheritdoc />
         public Task UpdatePackageManifest(string packageIdentifier, PackageManifest packageManifest)
         {
-            using var connection = this.OpenConnection();
-
-            // Ensure the manifest exists before updating
-            this.GetManifestOrThrow(connection, packageIdentifier);
-            this.UpsertManifest(connection, packageManifest);
-
-            return Task.CompletedTask;
+            ApiDataValidator.Validate(packageManifest);
+            return this.WriteAsync(connection =>
+            {
+                // Ensure the manifest exists before updating
+                this.GetManifestOrThrow(connection, packageIdentifier);
+                this.UpsertManifest(connection, packageManifest);
+            });
         }
 
         /// <inheritdoc />
@@ -714,10 +708,29 @@ namespace Microsoft.WinGet.RestSource.Sqlite
             createCmd.ExecuteNonQuery();
         }
 
+        private async Task WriteAsync(Action<SqliteConnection> action)
+        {
+            await this.writeLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                using var connection = this.OpenConnection();
+                action(connection);
+            }
+            finally
+            {
+                this.writeLock.Release();
+            }
+        }
+
         private SqliteConnection OpenConnection()
         {
             var connection = new SqliteConnection(this.connectionString);
             connection.Open();
+
+            using var busyTimeout = connection.CreateCommand();
+            busyTimeout.CommandText = "PRAGMA busy_timeout=5000;";
+            busyTimeout.ExecuteNonQuery();
+
             return connection;
         }
 

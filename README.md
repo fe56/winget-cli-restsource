@@ -21,14 +21,20 @@ docker compose up -d
 ```
 
 The server starts on **http://localhost:8080**:
-- **REST API**: `http://localhost:8080/api/` — winget client compatible
-- **Admin UI**: `http://localhost:8080/admin` — Blazor FluentUI management dashboard
+- **Catalog UI**: `http://localhost:8080/` — browse packages
+- **Admin UI**: `http://localhost:8080/admin` — add, edit, and delete manifests (YAML or JSON)
+- **REST API**: `http://localhost:8080/api` — winget client compatible
+- **Health**: `http://localhost:8080/health`
 
 ### Add as a winget source
 
 ```powershell
-winget source add -n "my-private-repo" -a http://localhost:8080/api/ -t "Microsoft.Rest"
+winget source add -n local -a http://localhost:8080/api -t "Microsoft.Rest"
+winget search --source local
+winget show --source local Sample.YamlApp
 ```
+
+Paste a merged YAML manifest (see `src/WinGet.RestSource.Server/Samples/sample.package.yaml`) in **Manage packages**, or POST JSON to `/api/packageManifests`. `winget install` only works when the installer URL and SHA256 are real. Remote hosts need HTTPS; localhost can use HTTP.
 
 ### Configuration
 
@@ -112,7 +118,11 @@ cd src/WinGet.RestSource.Server
 dotnet run
 ```
 
-Then add the source: `winget source add -n "local" -a http://localhost:5141/api/ -t "Microsoft.Rest"`
+Then open `http://localhost:5141` to browse the catalog, or add the source:
+
+```powershell
+winget source add -n local -a http://localhost:5141/api -t "Microsoft.Rest"
+```
 
 ### Azure Functions (Legacy)
 

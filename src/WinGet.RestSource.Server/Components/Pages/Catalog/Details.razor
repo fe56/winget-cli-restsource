@@ -1,0 +1,97 @@
+@page "/packages/{PackageId}"
+@using Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas
+@using Microsoft.WinGet.RestSource.Utils.Models.Schemas
+@inject PackageCatalogService Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>@(manifest?.PackageIdentifier ?? "Package")</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
+    <FluentButton Appearance="ButtonAppearance.Outline" OnClick="@(() => Navigation.NavigateTo("/"))">
+        Back to catalog
+    </FluentButton>
+
+    @if (isLoading)
+    {
+        <FluentSpinner />
+    }
+    else if (showError)
+    {
+        <FluentMessageBar Title="Error" Intent="@MessageBarIntent.Error">@errorMessage</FluentMessageBar>
+    }
+    else if (manifest == null)
+    {
+        <FluentCard>
+            <FluentText>Package not found.</FluentText>
+        </FluentCard>
+    }
+    else
+    {
+        <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">@GetPackageName(manifest)</FluentText>
+        <FluentCard>
+            <p><strong>Identifier:</strong> @manifest.PackageIdentifier</p>
+            <p><strong>Versions:</strong> @(manifest.Versions?.Count ?? 0)</p>
+        </FluentCard>
+
+        @if (manifest.Versions != null)
+        {
+            foreach (var version in manifest.Versions)
+            {
+                <FluentCard>
+                    <FluentText Weight="TextWeight.Semibold">Version @version.PackageVersion</FluentText>
+                    @if (version.DefaultLocale != null)
+                    {
+                        <p><strong>Name:</strong> @version.DefaultLocale.PackageName</p>
+                        <p><strong>Publisher:</strong> @version.DefaultLocale.Publisher</p>
+                        <p><strong>Description:</strong> @version.DefaultLocale.ShortDescription</p>
+                    }
+
+                    @if (version is VersionExtended extended && extended.Installers?.Any() == true)
+                    {
+                        <FluentDataGrid Items="@extended.Installers.AsQueryable()" TGridItem="Installer">
+                            <PropertyColumn Property="@(i => i.Architecture)" Title="Architecture" />
+                            <PropertyColumn Property="@(i => i.InstallerType)" Title="Type" />
+                            <PropertyColumn Property="@(i => i.InstallerUrl)" Title="URL" />
+                        </FluentDataGrid>
+                    }
+                </FluentCard>
+            }
+        }
+    }
+</FluentStack>
+
+@code {
+    [Parameter]
+    public string? PackageId { get; set; }
+
+    private PackageManifest? manifest;
+    private bool isLoading = true;
+    private bool showError;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        showError = false;
+        try
+        {
+            manifest = string.IsNullOrWhiteSpace(PackageId)
+                ? null
+                : await Catalog.GetAsync(Uri.UnescapeDataString(PackageId));
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string GetPackageName(PackageManifest package)
+    {
+        return package.Versions?.FirstOrDefault()?.DefaultLocale?.PackageName ?? package.PackageIdentifier;
+    }
+}

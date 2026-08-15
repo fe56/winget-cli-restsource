@@ -1,27 +1,40 @@
 @inherits LayoutComponentBase
-@using Microsoft.FluentUI.AspNetCore.Components
 
 <FluentLayout>
-    <FluentHeader>
-        WinGet REST Source
-    </FluentHeader>
+    <FluentLayoutItem Area="@LayoutArea.Header">
+        <FluentStack VerticalAlignment="VerticalAlignment.Center">
+            <FluentLayoutHamburger />
+            <FluentText Weight="TextWeight.Bold" Size="TextSize.Size400">
+                WinGet REST Source
+            </FluentText>
+        </FluentStack>
+    </FluentLayoutItem>
 
-    <FluentStack Orientation="Orientation.Horizontal" Width="100%">
-        <FluentNavMenu Width="250" Title="Navigation">
-            <FluentNavLink Href="/admin" Match="NavLinkMatch.All">Dashboard</FluentNavLink>
-            <FluentNavLink Href="/admin/packages">Packages</FluentNavLink>
-        </FluentNavMenu>
+    <FluentLayoutItem Area="@LayoutArea.Navigation" Width="250px">
+        <FluentNav Padding="@Padding.All2" Style="height: 100%;">
+            <FluentNavItem Href="/"
+                           Match="NavLinkMatch.All"
+                           IconRest="@(new Icons.Regular.Size20.AppsList())">
+                Catalog
+            </FluentNavItem>
+            <FluentNavItem Href="/admin"
+                           IconRest="@(new Icons.Regular.Size20.Board())">
+                Dashboard
+            </FluentNavItem>
+            <FluentNavItem Href="/admin/packages"
+                           IconRest="@(new Icons.Regular.Size20.Box())">
+                Manage packages
+            </FluentNavItem>
+        </FluentNav>
+    </FluentLayoutItem>
 
-        <FluentBodyContent>
-            <div style="padding: 1rem;">
-                @Body
-            </div>
-        </FluentBodyContent>
-    </FluentStack>
+    <FluentLayoutItem Area="@LayoutArea.Content" Padding="@Padding.All3">
+        @Body
+    </FluentLayoutItem>
 
-    <FluentFooter>
-        <div style="text-align: center; width: 100%; font-size: 0.8rem; color: #888;">
-            WinGet REST Source — Self-Hosted
-        </div>
-    </FluentFooter>
+    <FluentLayoutItem Area="@LayoutArea.Footer">
+        Self-hosted WinGet REST source
+    </FluentLayoutItem>
 </FluentLayout>
+
+<FluentProviders />

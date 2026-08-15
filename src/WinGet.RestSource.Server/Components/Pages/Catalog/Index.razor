@@ -1,0 +1,142 @@
+@page "/"
+@using Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas
+@using Microsoft.WinGet.RestSource.Utils.Models.Schemas
+@inject PackageCatalogService Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>Package catalog</PageTitle>
+
+<FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
+    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Package catalog</FluentText>
+    <FluentText>
+        Browse packages hosted by this REST source. Add the source in winget, then search or install from the CLI.
+    </FluentText>
+
+    <FluentCard>
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
+            <FluentText Weight="TextWeight.Semibold">Add this source</FluentText>
+            <div class="command-block">@WingetAddCommand</div>
+            <FluentButton Appearance="ButtonAppearance.Outline" OnClick="CopyWingetCommand">Copy command</FluentButton>
+        </FluentStack>
+    </FluentCard>
+
+    <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8px">
+        <FluentTextInput @bind-Value="searchQuery"
+                         Placeholder="Search packages"
+                         Style="flex: 1;"
+                         ChangeAfterKeyPress="@([KeyPress.For(KeyCode.Enter)])"
+                         OnChangeAfterKeyPress="OnSearchKeyPress">
+            <StartTemplate>
+                <FluentIcon Value="@(new Icons.Regular.Size16.Search())" />
+            </StartTemplate>
+        </FluentTextInput>
+        <FluentButton Appearance="ButtonAppearance.Primary" OnClick="SearchAsync">Search</FluentButton>
+    </FluentStack>
+
+    @if (isLoading)
+    {
+        <FluentSpinner />
+    }
+    else if (showError)
+    {
+        <FluentMessageBar Title="Error" Intent="@MessageBarIntent.Error">@errorMessage</FluentMessageBar>
+    }
+    else if (packages.Count == 0)
+    {
+        <FluentCard>
+            <FluentText>No packages found. Add one from Manage packages.</FluentText>
+            <FluentButton Appearance="ButtonAppearance.Primary" OnClick="@(() => Navigation.NavigateTo("/admin/packages/new"))">
+                Add a package
+            </FluentButton>
+        </FluentCard>
+    }
+    else
+    {
+        <div class="catalog-grid">
+            @foreach (var package in packages)
+            {
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
+                        <FluentText Weight="TextWeight.Semibold">@GetPackageName(package)</FluentText>
+                        <FluentText>@package.PackageIdentifier</FluentText>
+                        <FluentText>@GetPublisher(package)</FluentText>
+                        <FluentText>Versions: @(package.Versions?.Count ?? 0)</FluentText>
+                        <FluentButton Appearance="ButtonAppearance.Outline"
+                                      OnClick="@(() => Navigation.NavigateTo($"/packages/{Uri.EscapeDataString(package.PackageIdentifier)}"))">
+                            View
+                        </FluentButton>
+                    </FluentStack>
+                </FluentCard>
+            }
+        </div>
+    }
+</FluentStack>
+
+@code {
+    private List<PackageManifest> packages = new();
+    private bool isLoading = true;
+    private string searchQuery = string.Empty;
+    private bool showError;
+    private string errorMessage = string.Empty;
+
+    private string WingetAddCommand =>
+        $"winget source add -n local -a {Navigation.BaseUri.TrimEnd('/')}/api -t Microsoft.Rest";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task OnSearchKeyPress(FluentKeyPressEventArgs _)
+    {
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        isLoading = true;
+        showError = false;
+        try
+        {
+            var result = await Catalog.SearchAsync(searchQuery);
+            packages = result.ToList();
+        }
+        catch (Exception ex)
+        {
+            packages = new List<PackageManifest>();
+            showError = true;
+            errorMessage = PackageCatalogService.GetErrorMessage(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CopyWingetCommand()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", WingetAddCommand);
+        }
+        catch
+        {
+            // Clipboard may be unavailable; the command remains visible.
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    private static string GetPackageName(PackageManifest manifest)
+    {
+        var version = manifest.Versions?.FirstOrDefault();
+        return version?.DefaultLocale?.PackageName ?? manifest.PackageIdentifier;
+    }
+
+    private static string GetPublisher(PackageManifest manifest)
+    {
+        var version = manifest.Versions?.FirstOrDefault();
+        return version?.DefaultLocale?.Publisher ?? string.Empty;
+    }
+}

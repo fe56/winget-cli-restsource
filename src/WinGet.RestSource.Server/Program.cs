@@ -1,9 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.FluentUI.AspNetCore.Components;
 using Microsoft.WinGet.RestSource.AppConfig;
 using Microsoft.WinGet.RestSource.Server.AppConfig;
 using Microsoft.WinGet.RestSource.Server.Middleware;
+using Microsoft.WinGet.RestSource.Server.Services;
 using Microsoft.WinGet.RestSource.Sqlite;
 using Microsoft.WinGet.RestSource.Utils.Common;
 using Microsoft.WinGet.RestSource.Utils.Constants;
@@ -32,6 +31,8 @@ builder.Services.AddSingleton<IApiDataStore>(sp =>
 builder.Services.AddSingleton<IWinGetAppConfig>(sp =>
     new SimpleAppConfig(builder.Configuration));
 
+builder.Services.AddScoped<PackageCatalogService>();
+
 // API key auth filter
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 
@@ -53,19 +54,27 @@ var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
 
 app.UseStaticFiles();
-app.UseRouting();
 app.UseAntiforgery();
 
 app.MapControllers();
 app.MapRazorComponents<Microsoft.WinGet.RestSource.Server.Components.App>()
     .AddInteractiveServerRenderMode();
 
-// Redirect root to admin dashboard
-app.MapGet("/", () => Results.Redirect("/admin"));
+app.MapGet("/health", async (IApiDataStore store) =>
+{
+    await store.Count();
+    return Results.Ok(new { status = "ok" });
+});
 
 app.Run();
 
+/// <summary>
+/// Exposes the implicit Program type to WebApplicationFactory tests.
+/// </summary>
+public partial class Program
+{
+}

@@ -1,0 +1,17 @@
+# Sample merged winget manifest for the self-hosted REST source.
+# InstallerUrl/SHA256 are placeholders. Replace them with a real installer
+# before `winget install` will succeed.
+PackageIdentifier: Sample.YamlApp
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: Sample Publisher
+PackageName: Sample YAML App
+License: MIT
+ShortDescription: A sample package imported from YAML
+ManifestType: merged
+ManifestVersion: 1.6.0
+Installers:
+- Architecture: x64
+  InstallerType: exe
+  InstallerUrl: https://example.com/sample.exe
+  InstallerSha256: 01234567890ABCDEF01234567890ABCDEF01234567890ABCDEF1234567890ABC

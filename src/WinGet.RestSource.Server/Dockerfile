@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files first for better layer caching
@@ -24,7 +24,7 @@ COPY Microsoft.WindowsPackageManager.Rest/ Microsoft.WindowsPackageManager.Rest/
 RUN dotnet publish WinGet.RestSource.Server/WinGet.RestSource.Server.csproj -c Release -o /app/publish --no-restore
 
 # Runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # Create data directory for SQLite
@@ -40,7 +40,6 @@ ENV Database__Path=/data/winget.db
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost:8080/api/information || exit 1
+# The aspnet image does not include curl. Orchestrators can probe GET /health.
 
 ENTRYPOINT ["dotnet", "WinGet.RestSource.Server.dll"]
