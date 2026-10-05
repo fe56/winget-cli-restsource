@@ -6,7 +6,10 @@
 <PageTitle>Dashboard</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
-    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Dashboard</FluentText>
+    <div class="page-header">
+        <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Dashboard</FluentText>
+        <FluentText>Source status and the command winget uses to connect.</FluentText>
+    </div>
 
     @if (isLoading)
     {
@@ -14,28 +17,38 @@
     }
     else
     {
-        <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="16px">
-            <FluentCard Style="min-width: 200px;">
-                <FluentText Weight="TextWeight.Semibold">Total packages</FluentText>
-                <FluentText Weight="TextWeight.Bold" Size="TextSize.Size700">@packageCount</FluentText>
+        <div class="stat-row">
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="4px">
+                    <FluentText>Packages</FluentText>
+                    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size700">@packageCount</FluentText>
+                </FluentStack>
             </FluentCard>
-            <FluentCard Style="min-width: 200px;">
-                <FluentText Weight="TextWeight.Semibold">Server status</FluentText>
-                <FluentText>Online</FluentText>
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="4px">
+                    <FluentText>Status</FluentText>
+                    <FluentBadge Appearance="BadgeAppearance.Tint" Color="BadgeColor.Success" Content="Online" />
+                </FluentStack>
             </FluentCard>
-            <FluentCard Style="min-width: 240px;">
-                <FluentText Weight="TextWeight.Semibold">Source identifier</FluentText>
-                <FluentText>@sourceIdentifier</FluentText>
+            <FluentCard>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="4px">
+                    <FluentText>Source identifier</FluentText>
+                    <FluentText Weight="TextWeight.Semibold">@sourceIdentifier</FluentText>
+                </FluentStack>
             </FluentCard>
-        </FluentStack>
+        </div>
+
+        <SourceCommand />
 
         <FluentCard>
-            <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
-                <FluentText Weight="TextWeight.Semibold">Use with winget</FluentText>
-                <div class="command-block">@WingetAddCommand</div>
-                <FluentText>
-                    Supported REST versions: @string.Join(", ", supportedVersions)
-                </FluentText>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="12px">
+                <FluentText Weight="TextWeight.Semibold">REST versions this server accepts</FluentText>
+                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" HorizontalGap="8px">
+                    @foreach (var version in supportedVersions)
+                    {
+                        <FluentBadge Appearance="BadgeAppearance.Outline" Content="@version" />
+                    }
+                </FluentStack>
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8px">
                     <FluentButton Appearance="ButtonAppearance.Primary" OnClick="@(() => Navigation.NavigateTo("/admin/packages"))">
                         Manage packages
@@ -54,9 +67,6 @@
     private bool isLoading = true;
     private string sourceIdentifier = string.Empty;
     private IReadOnlyList<string> supportedVersions = Array.Empty<string>();
-
-    private string WingetAddCommand =>
-        $"winget source add -n local -a {Navigation.BaseUri.TrimEnd('/')}/api -t Microsoft.Rest";
 
     protected override async Task OnInitializedAsync()
     {

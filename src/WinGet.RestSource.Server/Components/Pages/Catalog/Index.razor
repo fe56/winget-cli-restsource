@@ -7,18 +7,14 @@
 <PageTitle>Package catalog</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical" VerticalGap="16px">
-    <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Package catalog</FluentText>
-    <FluentText>
-        Browse packages hosted by this REST source. Add the source in winget, then search or install from the CLI.
-    </FluentText>
+    <div class="page-header">
+        <FluentText Weight="TextWeight.Bold" Size="TextSize.Size600">Package catalog</FluentText>
+        <FluentText>
+            Browse packages in this source, then install them with the winget client.
+        </FluentText>
+    </div>
 
-    <FluentCard>
-        <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
-            <FluentText Weight="TextWeight.Semibold">Add this source</FluentText>
-            <div class="command-block">@WingetAddCommand</div>
-            <FluentButton Appearance="ButtonAppearance.Outline" OnClick="CopyWingetCommand">Copy command</FluentButton>
-        </FluentStack>
-    </FluentCard>
+    <SourceCommand />
 
     <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" HorizontalGap="8px">
         <FluentTextInput @bind-Value="searchQuery"
@@ -55,15 +51,20 @@
         <div class="catalog-grid">
             @foreach (var package in packages)
             {
-                <FluentCard>
+                <FluentCard Class="package-card">
                     <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
-                        <FluentText Weight="TextWeight.Semibold">@GetPackageName(package)</FluentText>
+                        <FluentStack Orientation="Orientation.Horizontal"
+                                     VerticalAlignment="VerticalAlignment.Center"
+                                     HorizontalAlignment="HorizontalAlignment.SpaceBetween">
+                            <FluentText Weight="TextWeight.Semibold">@GetPackageName(package)</FluentText>
+                            <FluentBadge Appearance="BadgeAppearance.Tint" Content="@GetVersion(package)" />
+                        </FluentStack>
                         <FluentText>@package.PackageIdentifier</FluentText>
                         <FluentText>@GetPublisher(package)</FluentText>
-                        <FluentText>Versions: @(package.Versions?.Count ?? 0)</FluentText>
+                        <FluentText>@GetDescription(package)</FluentText>
                         <FluentButton Appearance="ButtonAppearance.Outline"
                                       OnClick="@(() => Navigation.NavigateTo($"/packages/{Uri.EscapeDataString(package.PackageIdentifier)}"))">
-                            View
+                            Details
                         </FluentButton>
                     </FluentStack>
                 </FluentCard>
@@ -78,9 +79,6 @@
     private string searchQuery = string.Empty;
     private bool showError;
     private string errorMessage = string.Empty;
-
-    private string WingetAddCommand =>
-        $"winget source add -n local -a {Navigation.BaseUri.TrimEnd('/')}/api -t Microsoft.Rest";
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,21 +111,6 @@
         }
     }
 
-    private async Task CopyWingetCommand()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", WingetAddCommand);
-        }
-        catch
-        {
-            // Clipboard may be unavailable; the command remains visible.
-        }
-    }
-
-    [Inject]
-    private IJSRuntime JS { get; set; } = default!;
-
     private static string GetPackageName(PackageManifest manifest)
     {
         var version = manifest.Versions?.FirstOrDefault();
@@ -138,5 +121,16 @@
     {
         var version = manifest.Versions?.FirstOrDefault();
         return version?.DefaultLocale?.Publisher ?? string.Empty;
+    }
+
+    private static string GetDescription(PackageManifest manifest)
+    {
+        var version = manifest.Versions?.FirstOrDefault();
+        return version?.DefaultLocale?.ShortDescription ?? string.Empty;
+    }
+
+    private static string GetVersion(PackageManifest manifest)
+    {
+        return manifest.Versions?.FirstOrDefault()?.PackageVersion ?? "—";
     }
 }

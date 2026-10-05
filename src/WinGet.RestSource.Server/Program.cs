@@ -1,6 +1,4 @@
 using Microsoft.FluentUI.AspNetCore.Components;
-using Microsoft.WinGet.RestSource.AppConfig;
-using Microsoft.WinGet.RestSource.Server.AppConfig;
 using Microsoft.WinGet.RestSource.Server.Middleware;
 using Microsoft.WinGet.RestSource.Server.Services;
 using Microsoft.WinGet.RestSource.Sqlite;
@@ -27,9 +25,6 @@ builder.Services.AddSingleton<IApiDataStore>(sp =>
     new SqliteDataStore(
         sp.GetRequiredService<ILogger<SqliteDataStore>>(),
         dbPath));
-
-builder.Services.AddSingleton<IWinGetAppConfig>(sp =>
-    new SimpleAppConfig(builder.Configuration));
 
 builder.Services.AddScoped<PackageCatalogService>();
 

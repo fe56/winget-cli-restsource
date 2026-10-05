@@ -1,0 +1,43 @@
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<FluentCard>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="8px">
+        <FluentText Weight="TextWeight.Semibold">Connect winget</FluentText>
+        <FluentText>
+            Add this server as a REST source. Use an elevated terminal. HTTP works on localhost.
+        </FluentText>
+        <div class="command-block">@Command</div>
+        <FluentStack Orientation="Orientation.Horizontal" VerticalAlignment="VerticalAlignment.Center" HorizontalGap="12px">
+            <FluentButton Appearance="ButtonAppearance.Outline"
+                          IconStart="@(new Icons.Regular.Size16.Copy())"
+                          OnClick="CopyAsync">
+                Copy command
+            </FluentButton>
+            @if (copied)
+            {
+                <FluentText>Copied</FluentText>
+            }
+        </FluentStack>
+    </FluentStack>
+</FluentCard>
+
+@code {
+    private bool copied;
+
+    private string Command =>
+        $"winget source add -n local -a {Navigation.BaseUri.TrimEnd('/')}/api -t Microsoft.Rest";
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Command);
+            copied = true;
+        }
+        catch
+        {
+            copied = false;
+        }
+    }
+}
