@@ -1,4 +1,5 @@
 using Microsoft.FluentUI.AspNetCore.Components;
+using Microsoft.WinGet.RestSource.Server.Logging;
 using Microsoft.WinGet.RestSource.Server.Middleware;
 using Microsoft.WinGet.RestSource.Server.Services;
 using Microsoft.WinGet.RestSource.Sqlite;
@@ -12,6 +13,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Set ServerIdentifier from config/environment
 var serverIdentifier = builder.Configuration["ServerIdentifier"] ?? "winget-restsource-self-hosted";
 Environment.SetEnvironmentVariable(ApiConstants.ServerIdentifierEnvName, serverIdentifier);
+
+// Empty Logging:FilePath keeps console logging and skips the file.
+var logFile = builder.Configuration["Logging:FilePath"];
+if (!string.IsNullOrWhiteSpace(logFile))
+{
+    builder.Logging.AddFileLogger(logFile);
+}
 
 // Database
 var dbPath = builder.Configuration["Database:Path"] ?? "data/winget.db";

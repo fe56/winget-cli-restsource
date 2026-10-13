@@ -1,17 +1,31 @@
+# WinGet REST source.
+# Copy .env.example to .env and edit it, or rely on the defaults below.
+# Run from this directory: docker compose up -d --build
+
 services:
   winget-restsource:
     build:
       context: ..
       dockerfile: WinGet.RestSource.Server/Dockerfile
     ports:
-      - "8080:8080"
+      - "${HTTP_PORT:-8080}:${CONTAINER_PORT:-8080}"
     volumes:
-      - winget-data:/data
+      # Named volume by default. Set DATA_DIR or LOG_DIR to a host path
+      # such as ./data or ./logs to bind-mount that directory instead.
+      - ${DATA_DIR:-winget-data}:/data
+      - ${LOG_DIR:-winget-logs}:/logs
     environment:
-      - Database__Path=/data/winget.db
-      - ServerIdentifier=winget-restsource-self-hosted
-      - ApiSettings__ApiKey=${API_KEY:-}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: ${CONTAINER_PORT:-8080}
+      ASPNETCORE_URLS: http://+:${CONTAINER_PORT:-8080}
+      ServerIdentifier: ${SERVER_NAME:-winget-restsource-self-hosted}
+      Database__Path: ${DATABASE_PATH:-/data/winget.db}
+      Logging__FilePath: ${LOG_FILE:-/logs/winget-restsource.log}
+      Logging__LogLevel__Default: ${LOG_LEVEL:-Information}
+      Logging__LogLevel__Microsoft.AspNetCore: ${ASPNET_LOG_LEVEL:-Warning}
+      ApiSettings__ApiKey: ${API_KEY:-}
     restart: unless-stopped
 
 volumes:
   winget-data:
+  winget-logs:

@@ -11,6 +11,7 @@ namespace Microsoft.WinGet.RestSource.Server.Tests
     using System.Text;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Mvc.Testing;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.WinGet.RestSource.Utils.Models;
     using Microsoft.WinGet.RestSource.Utils.Models.ExtendedSchemas;
     using Microsoft.WinGet.RestSource.Utils.Models.Schemas;
@@ -183,6 +184,14 @@ namespace Microsoft.WinGet.RestSource.Server.Tests
             builder.UseSetting("Database:Path", this.dbPath);
             builder.UseSetting("ServerIdentifier", "test-restsource");
             builder.UseSetting("ApiSettings:ApiKey", this.apiKey);
+            builder.UseSetting("Logging:FilePath", string.Empty);
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Logging:FilePath"] = string.Empty,
+                });
+            });
             builder.UseEnvironment("Development");
         }
 

@@ -380,3 +380,6 @@ src/WinGet.RestSource.Server/data/
 *.db-wal
 *.db-shm
 
+# Local docker compose overrides (may contain an API key)
+.env
+

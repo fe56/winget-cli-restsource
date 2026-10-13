@@ -8,34 +8,36 @@ COPY WinGet.RestSource/WinGet.RestSource.csproj WinGet.RestSource/
 COPY WinGet.RestSource.Utils/WinGet.RestSource.Utils.csproj WinGet.RestSource.Utils/
 COPY NuGet.config ./
 
-# Restore only the Server project and its dependencies
 RUN dotnet restore WinGet.RestSource.Server/WinGet.RestSource.Server.csproj
 
-# Copy source files
 COPY WinGet.RestSource.Server/ WinGet.RestSource.Server/
 COPY WinGet.RestSource/ WinGet.RestSource/
 COPY WinGet.RestSource.Utils/ WinGet.RestSource.Utils/
 
-# Build and publish
 RUN dotnet publish WinGet.RestSource.Server/WinGet.RestSource.Server.csproj -c Release -o /app/publish --no-restore
 
-# Runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# Create data directory for SQLite
-RUN mkdir -p /data
+# The runtime image defaults to a non-root user. Stay root so a mounted
+# data or log directory is writable.
+USER root
+RUN mkdir -p /data /logs
 
 COPY --from=build /app/publish .
 
-# Volume for persistent SQLite database
-VOLUME /data
+VOLUME ["/data", "/logs"]
 
-ENV ASPNETCORE_URLS=http://+:8080
-ENV Database__Path=/data/winget.db
+# Runtime defaults. docker compose and `docker run -e` override them.
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_HTTP_PORTS=8080 \
+    ASPNETCORE_URLS=http://+:8080 \
+    ServerIdentifier=winget-restsource-self-hosted \
+    Database__Path=/data/winget.db \
+    Logging__FilePath=/logs/winget-restsource.log \
+    Logging__LogLevel__Default=Information \
+    ApiSettings__ApiKey=
 
 EXPOSE 8080
-
-# The aspnet image does not include curl. Orchestrators can probe GET /health.
 
 ENTRYPOINT ["dotnet", "WinGet.RestSource.Server.dll"]
